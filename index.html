@@ -383,8 +383,8 @@
     <!-- KPIs: removido "Leito Natural" -->
     <div class="kpi-grid" id="kpiGrid">
       <div class="kpi-box"><div class="kpi-label">Rodovias Estaduais</div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub">códigos AM cadastrados</div></div>
-      <div class="kpi-box amarelo"><div class="kpi-label">Extensão Total</div><div class="kpi-value" id="kpiExtTotal">—</div><div class="kpi-sub">km de rodovias AM</div></div>
-      <div class="kpi-box verde"><div class="kpi-label">Pavimentada</div><div class="kpi-value" id="kpiExtPav">—</div><div class="kpi-sub">km pavimentados</div></div>
+      <div class="kpi-box amarelo"><div class="kpi-label">Extensão Total</div><div class="kpi-value" id="kpiExtTotal" style="font-size:1.35rem">—</div><div class="kpi-sub">km de rodovias AM</div></div>
+      <div class="kpi-box verde"><div class="kpi-label">Pavimentada</div><div class="kpi-value" id="kpiExtPav" style="font-size:1.35rem">—</div><div class="kpi-sub">km pavimentados</div></div>
       <div class="kpi-box"><div class="kpi-label">Contratos Ativos</div><div class="kpi-value" id="kpiContrAtivos">—</div><div class="kpi-sub">andamento + paralisado</div></div>
       <div class="kpi-box amarelo"><div class="kpi-label">Total Investido</div><div class="kpi-value" id="kpiTotalInvest">—</div><div class="kpi-sub">excluídos rescindidos</div></div>
     </div>
@@ -459,6 +459,17 @@
 
         <div class="contratos-section">
           <div class="table-title">💼 Contratos desta Rodovia</div>
+          <div id="contratosRodoviaResumo" style="margin-bottom:.75rem"></div>
+          <div style="margin-bottom:.75rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <label style="font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza-med);margin:0">Filtrar por situação:</label>
+            <select id="filtroSituacaoContratos" onchange="filtrarContratosExibidos()" style="font-size:.78rem;padding:.3rem .8rem;width:auto">
+              <option value="">Todos</option>
+              <option value="andamento">Em Andamento</option>
+              <option value="paralisado">Paralisado</option>
+              <option value="concluido">Concluído</option>
+              <option value="entregue">Entregue/Inaugurado</option>
+            </select>
+          </div>
           <div id="contratosRodovia">
             <div class="contratos-sem-dados">Selecione uma rodovia para ver os contratos.</div>
           </div>
@@ -669,13 +680,13 @@ function renderKpisRodovias(rodoviasUnicas) {
     extTotal += ext;
     const pav = (r.pavimentacao || r.situacao || '').toUpperCase();
     if      (pav.includes('PAV') || pav.includes('DUP')) extPav += ext;
-    else if (pav.includes('LEI'))  extLei += ext;
+    else if (pav.includes('LEI') || pav === 'LEN')  extLei += ext;
     else if (pav.includes('PLA'))  extPla += ext;
   });
 
   el('kpiTotal').textContent    = total;
-  el('kpiExtTotal').textContent = (extTotal/1000).toFixed(2)+'k';
-  el('kpiExtPav').textContent   = extPav.toFixed(0);
+  el('kpiExtTotal').textContent = extTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
+  el('kpiExtPav').textContent   = extPav.toFixed(2) + ' km';
 
   // FIX: Gráfico sem "Duplicado"; valores acima das barras via datalabels
   const ctxExt = document.getElementById('chartExt').getContext('2d');
@@ -761,6 +772,7 @@ async function carregarContratos() {
     const I = {
       contrato:    idxOf(h,'no do ct/cv','nº do ct/cv','no ct/cv'),
       nome:        idxOf(h,'objeto','resumo do objeto'),
+      objEspecif:  idxOf(h,'objeto específico','objeto especifico','obj. específico','obj especifico'),
       municipio:   idxOf(h,'município','municipio'),
       status:      idxOf(h,'situação eobras','situação real','situação','situacao','status'),
       empresa:     idxOf(h,'contratada /convenente','contratada/convenente'),
@@ -782,6 +794,7 @@ async function carregarContratos() {
       return {
         contrato:    valAt(row, I.contrato),
         nome:        valAt(row, I.nome),
+        objEspecif:  valAt(row, I.objEspecif),
         municipio:   valAt(row, I.municipio),
         statusRaw,
         status,
@@ -818,18 +831,21 @@ function renderKpisContratos() {
     ? (totalVal/1e6).toFixed(0)+'M'
     : totalVal > 0 ? totalVal.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}) : '—';
 
-  const counts = { andamento: 0, paralisado: 0, concluido: 0, outro: 0 };
-  rodContr.forEach(c => { counts[c.status] = (counts[c.status]||0) + 1; });
+  const counts = { andamento: 0, paralisado: 0, concluido: 0, entregue: 0 };
+  rodContr.forEach(c => {
+    const k = (c.status === 'entregue') ? 'entregue' : (c.status === 'andamento' || c.status === 'paralisado' || c.status === 'concluido') ? c.status : null;
+    if (k) counts[k] = (counts[k]||0) + 1;
+  });
 
   const ctxC = document.getElementById('chartContr').getContext('2d');
   if (chartContr) chartContr.destroy();
   chartContr = new Chart(ctxC, {
     type: 'doughnut',
     data: {
-      labels: ['Em Andamento', 'Paralisado', 'Concluído', 'Outro'],
+      labels: ['Em Andamento', 'Paralisado', 'Concluído', 'Entregue/Inaugurado'],
       datasets: [{
-        data: [counts.andamento, counts.paralisado, counts.concluido, counts.outro],
-        backgroundColor: ['#007B3E', '#F5A623', '#002D72', '#8896A8'],
+        data: [counts.andamento, counts.paralisado, counts.concluido, counts.entregue],
+        backgroundColor: ['#007B3E', '#F5A623', '#002D72', '#E65C00'],
         borderWidth: 2, borderColor: '#fff',
       }]
     },
@@ -1174,26 +1190,28 @@ function renderContratosRodovia(nomeRodovia) {
   const filtrados = todosContratos.filter(c => {
     if (c.status === 'excluido') return false;
 
-    const nomeUpper = (c.nome || '').toUpperCase().trim();
-    const locUpper  = (c.localizacao || '').toUpperCase().trim();
+    const nomeUpper     = (c.nome || '').toUpperCase().trim();
+    const locUpper      = (c.localizacao || '').toUpperCase().trim();
+    const especifUpper  = (c.objEspecif || '').toUpperCase().trim();
 
-    // Verificar se alguma variante do código aparece no objeto
+    // Se existe objeto específico E ele menciona código de rodovia:
+    // usar APENAS o objeto específico para decidir se pertence a esta rodovia
+    if (especifUpper) {
+      return variantesRod.some(v => especifUpper.includes(v.toUpperCase()));
+    }
+
+    // Sem objeto específico: usar objeto geral + localização (lógica anterior)
     const codMencionado = variantesRod.some(v =>
       nomeUpper.includes(v.toUpperCase()) || locUpper.includes(v.toUpperCase())
     );
     if (!codMencionado) return false;
 
     // FIX: verificar se o objeto NÃO começa com palavras que indicam ramal/vicinal
-    // (a obra é o ramal/vicinal que está SOBRE a rodovia, não obra na rodovia em si)
     const comecaComExcludente = prefixosExcludentes.some(p =>
       nomeUpper.startsWith(p)
     );
     if (comecaComExcludente) return false;
 
-    // Verificar se a menção ao código é como rodovia principal:
-    // Aceitar padrões como "RODOVIA AM-010", "NA AM-010", "DA AM-010",
-    // "KM XX DA AM-010", "DUPLICAÇÃO DA RODOVIA AM-010", etc.
-    // Rejeitar se a menção é apenas "LOCALIZADO NO KM XX DA AM-010" após referência a ramal
     const PADROES_RAMAL = [
       /RAMAL\s+\w+\s+LOCALIZADO/i,
       /RAMAL\s+\w+\s+SITUADO/i,
@@ -1301,7 +1319,7 @@ function renderizarMapa(nomeRodovia) {
         const sit = (f.properties['SITUAÇÃO']||'').toUpperCase();
         let cor = '#002D72';
         if (sit==='PAV') cor='#007B3E';
-        if (sit==='LEI') cor='#F5A623';
+        if (sit==='LEI'||sit==='LEN') cor='#F5A623';
         if (sit==='PLA') cor='#8896A8';
         return { color: cor, weight:5, opacity:.9, lineJoin:'round', lineCap:'round' };
       },
@@ -1342,7 +1360,7 @@ function chipRev(text) {
 function chipSituacao(sit) {
   const s = (sit||'').toUpperCase();
   if (s.includes('PAVIMENT')||s==='PAV') return `<span class="chip-sit pav"><span class="chip-dot"></span>Pavimentada</span>`;
-  if (s.includes('LEITO')||s==='LEI')   return `<span class="chip-sit lei"><span class="chip-dot"></span>Leito Natural</span>`;
+  if (s.includes('LEITO')||s==='LEI'||s==='LEN')   return `<span class="chip-sit lei"><span class="chip-dot"></span>Leito Natural</span>`;
   if (s.includes('PLANEJ')||s==='PLA')  return `<span class="chip-sit pla"><span class="chip-dot"></span>Planejada</span>`;
   if (s.includes('DUPLIC')||s==='DUP')  return `<span class="chip-sit pav"><span class="chip-dot"></span>Duplicada</span>`;
   return `<span class="chip-sit out"><span class="chip-dot"></span>${sit||'Não informado'}</span>`;
