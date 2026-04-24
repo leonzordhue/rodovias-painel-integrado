@@ -580,8 +580,8 @@ function renderKpisRodovias(rodoviasUnicas) {
     const ext = r.extensao;
     const pav = (r.pavimentacao || r.situacao || '').toUpperCase();
     if (pav.includes('PAV') || pav.includes('DUP')) extPav += ext;
-    else if (pav.includes('LEI') || pav.includes('LEN')) extLei += ext;
-    else if (pav.includes('PLA')) extPla += ext;
+    else if (pav.includes('LEI') || pav.includes('LEN') || pav.includes('IMP')) extLei += ext;
+    else extPla += ext;
   });
   el('kpiTotal').textContent = total;
   el('kpiExtTotal').textContent = extTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
