@@ -430,11 +430,6 @@ const CONTRATOS_CSV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1gPu9
 const SINISTROS_SHEET = '1y7h-FRn0jBfhlr9e7EwDBNES-0hCUhSeAf5s4tVEWxE';
 const SINISTROS_URL   = `https://docs.google.com/spreadsheets/d/${SINISTROS_SHEET}/gviz/tq?tqx=out:csv&sheet=Noticias`;
 
-// Extensão da malha estadual AM — fonte: GeoJSON SEINFRA/SNV (soberano)
-const EXT_TOTAL_KM = 3458.2;
-const EXT_PAV_KM   = 972.2;
-const EXT_LEI_KM   = 140.2;
-const EXT_PLA_KM   = 2345.7;
 let todasRodovias = [], geoJsonData = null, todosContratos = [], todosSinistros = [];
 let leafletMap = null, tracadoLayer = null;
 let chartExt, chartContr, chartSinisRod, chartSinisTipo;
@@ -579,12 +574,17 @@ async function carregarRodovias() {
 }
 function renderKpisRodovias(rodoviasUnicas) {
   const total = rodoviasUnicas.length;
-  const extTotal = EXT_TOTAL_KM;
-  const extPav   = EXT_PAV_KM;
-  const extLei   = EXT_LEI_KM;
-  const extPla   = EXT_PLA_KM;
+  let extLei = 0, extPav = 0, extPla = 0;
+  let extTotal = todasRodovias.reduce((acc, r) => acc + r.extensao, 0);
+  todasRodovias.forEach(r => {
+    const ext = r.extensao;
+    const pav = (r.pavimentacao || r.situacao || '').toUpperCase();
+    if (pav.includes('PAV') || pav.includes('DUP')) extPav += ext;
+    else if (pav.includes('LEI') || pav.includes('LEN')) extLei += ext;
+    else if (pav.includes('PLA')) extPla += ext;
+  });
   el('kpiTotal').textContent = total;
-  el('kpiExtTotal').textContent = (extTotal / 1000).toFixed(2).replace('.', ',') + 'k km';
+  el('kpiExtTotal').textContent = extTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
   el('kpiExtPav').textContent = extPav.toLocaleString('pt-BR', {minimumFractionDigits:2}) + ' km';
   const ctxExt = document.getElementById('chartExt').getContext('2d');
   if (chartExt) chartExt.destroy();
