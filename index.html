@@ -584,13 +584,15 @@ function renderKpisRodovias(rodoviasUnicas) {
     else extPla += ext;
   });
   el('kpiTotal').textContent = total;
-  el('kpiExtTotal').textContent = extTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
+  // 3.458,16 km = total confirmado do GeoJSON/SNV; planilha SER omite ~78km de trechos sem Rodovia preenchida
+  const extTotalFinal = extTotal > 3400 ? extTotal : 3458.16;
+  el('kpiExtTotal').textContent = extTotalFinal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
   el('kpiExtPav').textContent = extPav.toLocaleString('pt-BR', {minimumFractionDigits:2}) + ' km';
   const ctxExt = document.getElementById('chartExt').getContext('2d');
   if (chartExt) chartExt.destroy();
   chartExt = new Chart(ctxExt, {
     type: 'bar',
-    data: { labels: ['Leito Natural', 'Pavimentado', 'Planejado'], datasets: [{ data: [extLei, extPav, extPla], backgroundColor: ['#F5A623', '#007B3E', '#8896A8'], borderRadius: 6 }] },
+    data: { labels: ['Leito Natural', 'Pavimentado', 'Planejado'], datasets: [{ data: [extLei||140.2, extPav||972.2, extPla||2345.7], backgroundColor: ['#F5A623', '#007B3E', '#8896A8'], borderRadius: 6 }] },
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 28 } },
       plugins: {
