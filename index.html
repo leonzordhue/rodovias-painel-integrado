@@ -421,7 +421,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 // VERSÃO 3.4 – CORREÇÃO DA EXTENSÃO TOTAL (SOMA DIRETA DE TODOS OS TRECHOS)
-const SPREADSHEET_ID  = '1bYf2anVF4un84-lusSOeSRaNLiod9fq0joUEnbgHxnM';
+const SPREADSHEET_ID  = '17C0uCIPesYC_L4Tq41eFI_4rXSVJHAKN';
 const API_KEY         = 'AIzaSyDaitkJNDTZi3BMFAe9u4wV6U-DIgUS7NA';
 const RANGE           = 'A:S';
 const BASE_URL        = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
@@ -580,19 +580,17 @@ function renderKpisRodovias(rodoviasUnicas) {
     const ext = r.extensao;
     const pav = (r.pavimentacao || r.situacao || '').toUpperCase();
     if (pav.includes('PAV') || pav.includes('DUP')) extPav += ext;
-    else if (pav.includes('LEI') || pav.includes('LEN') || pav.includes('IMP')) extLei += ext;
-    else extPla += ext;
+    else if (pav.includes('LEI') || pav.includes('LEN')) extLei += ext;
+    else if (pav.includes('PLA')) extPla += ext;
   });
   el('kpiTotal').textContent = total;
-  // 3.458,16 km = total confirmado do GeoJSON/SNV; planilha SER omite ~78km de trechos sem Rodovia preenchida
-  const extTotalFinal = extTotal > 3400 ? extTotal : 3458.16;
-  el('kpiExtTotal').textContent = extTotalFinal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
+  el('kpiExtTotal').textContent = extTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' km';
   el('kpiExtPav').textContent = extPav.toLocaleString('pt-BR', {minimumFractionDigits:2}) + ' km';
   const ctxExt = document.getElementById('chartExt').getContext('2d');
   if (chartExt) chartExt.destroy();
   chartExt = new Chart(ctxExt, {
     type: 'bar',
-    data: { labels: ['Leito Natural', 'Pavimentado', 'Planejado'], datasets: [{ data: [extLei||140.2, extPav||972.2, extPla||2345.7], backgroundColor: ['#F5A623', '#007B3E', '#8896A8'], borderRadius: 6 }] },
+    data: { labels: ['Leito Natural', 'Pavimentado', 'Planejado'], datasets: [{ data: [extLei, extPav, extPla], backgroundColor: ['#F5A623', '#007B3E', '#8896A8'], borderRadius: 6 }] },
     options: {
       responsive: true, maintainAspectRatio: false, layout: { padding: { top: 28 } },
       plugins: {
