@@ -429,14 +429,12 @@ const GEOJSON_URL     = 'https://raw.githubusercontent.com/leonzordhue/seinfra-r
 const CONTRATOS_CSV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1gPu9G-nlHF_3d_wP10bgczuYMnR1gEZYcUkFE5N5_WetTkWH3aacrMB0blP-7gESBrtouF5gI5Yb/pub?gid=997762507&single=true&output=csv';
 const SINISTROS_SHEET = '1y7h-FRn0jBfhlr9e7EwDBNES-0hCUhSeAf5s4tVEWxE';
 const SINISTROS_URL   = `https://docs.google.com/spreadsheets/d/${SINISTROS_SHEET}/gviz/tq?tqx=out:csv&sheet=Noticias`;
-// Extensão por situação — calculado do GeoJSON SEINFRA (fonte soberana)
-// Garante o KPI mesmo se a planilha SER não carregar
-const GEO_EXT = {
-  total:   3458.2,
-  kpi: { 'Pavimentado': 972.2, 'Leito Natural': 140.2, 'Planejado': 2345.7 }
-};
 
-
+// Extensão da malha estadual AM — fonte: GeoJSON SEINFRA/SNV (soberano)
+const EXT_TOTAL_KM = 3458.2;
+const EXT_PAV_KM   = 972.2;
+const EXT_LEI_KM   = 140.2;
+const EXT_PLA_KM   = 2345.7;
 let todasRodovias = [], geoJsonData = null, todosContratos = [], todosSinistros = [];
 let leafletMap = null, tracadoLayer = null;
 let chartExt, chartContr, chartSinisRod, chartSinisTipo;
@@ -581,11 +579,10 @@ async function carregarRodovias() {
 }
 function renderKpisRodovias(rodoviasUnicas) {
   const total = rodoviasUnicas.length;
-  // Extensão via GEO_EXT (GeoJSON SEINFRA — independe da planilha SER)
-  const extTotal = GEO_EXT.total;
-  const extPav   = GEO_EXT.kpi['Pavimentado'];
-  const extLei   = GEO_EXT.kpi['Leito Natural'];
-  const extPla   = GEO_EXT.kpi['Planejado'];
+  const extTotal = EXT_TOTAL_KM;
+  const extPav   = EXT_PAV_KM;
+  const extLei   = EXT_LEI_KM;
+  const extPla   = EXT_PLA_KM;
   el('kpiTotal').textContent = total;
   el('kpiExtTotal').textContent = (extTotal / 1000).toFixed(2).replace('.', ',') + 'k km';
   el('kpiExtPav').textContent = extPav.toLocaleString('pt-BR', {minimumFractionDigits:2}) + ' km';
