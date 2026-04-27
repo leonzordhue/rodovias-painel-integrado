@@ -424,27 +424,48 @@
     <div class="kpi-box vermelho"><div class="kpi-label">Obstáculos Totais</div><div class="kpi-value" id="icmKpiBumps">—</div><div class="kpi-sub">bumps detectados</div></div>
   </div>
 
-  <!-- Mapa + Gráfico -->
-  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1rem;margin-bottom:1rem">
-    <div class="card" style="padding:0;overflow:hidden">
-      <div class="card-header" style="padding:.75rem 1rem">
-        <div class="card-header-icon">🗺️</div>
-        <div class="card-header-title">Mapa de Condição da Malha — IRI</div>
-        <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap;font-size:.6rem">
-          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#00b45a;display:inline-block"></span>Muito Bom</span>
-          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#69f0ae;display:inline-block"></span>Bom</span>
-          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#ffca28;display:inline-block"></span>Regular</span>
-          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#ff5252;display:inline-block"></span>Ruim</span>
-          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#8896A8;display:inline-block"></span>Sem dado</span>
+  <!-- Mapa grande + sidebar lista estilo icm_amazonas -->
+  <div style="display:grid;grid-template-columns:260px 1fr;gap:1rem;margin-bottom:1rem;min-height:520px">
+
+    <!-- SIDEBAR: lista de rodovias -->
+    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:.75rem 1rem;background:var(--azul);color:#fff;font-size:.65rem;font-weight:700;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center">
+        <span>TRECHOS ANALISADOS</span>
+        <span id="icm-road-count" style="background:rgba(255,255,255,.2);padding:.1em .5em;border-radius:10px">0</span>
+      </div>
+      <!-- Filtros por condição -->
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;padding:.5rem .75rem;border-bottom:1px solid var(--borda)">
+        <button class="icm-fpill active" data-f="all" onclick="icmFiltrar(this)">Todos</button>
+        <button class="icm-fpill" data-f="VeryGood" onclick="icmFiltrar(this)" style="background:#00b45a22;color:#00b45a;border-color:#00b45a">M.Bom</button>
+        <button class="icm-fpill" data-f="Good" onclick="icmFiltrar(this)" style="background:#69f0ae22;color:#007B3E;border-color:#69f0ae">Bom</button>
+        <button class="icm-fpill" data-f="Fair" onclick="icmFiltrar(this)" style="background:#ffca2822;color:#b8730a;border-color:#ffca28">Regular</button>
+        <button class="icm-fpill" data-f="Poor" onclick="icmFiltrar(this)" style="background:#ff525222;color:#C0392B;border-color:#ff5252">Ruim</button>
+      </div>
+      <!-- Lista de rodovias -->
+      <div id="icm-road-list" style="flex:1;overflow-y:auto"></div>
+    </div>
+
+    <!-- MAPA GRANDE -->
+    <div class="card" style="padding:0;overflow:hidden;position:relative;min-height:520px">
+      <div style="position:absolute;top:.75rem;left:.75rem;z-index:1000;background:rgba(255,255,255,.95);border-radius:8px;padding:.5rem .75rem;border:1px solid var(--borda);font-size:.65rem;display:flex;gap:.75rem;flex-wrap:wrap;backdrop-filter:blur(6px)">
+        <div class="card-header-title" style="font-size:.72rem;margin:0">🗺️ Condição da Malha — IRI</div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <span style="display:inline-flex;align-items:center;gap:.25rem"><span style="width:10px;height:4px;border-radius:2px;background:#00b45a;display:inline-block"></span>Muito Bom</span>
+          <span style="display:inline-flex;align-items:center;gap:.25rem"><span style="width:10px;height:4px;border-radius:2px;background:#69f0ae;display:inline-block"></span>Bom</span>
+          <span style="display:inline-flex;align-items:center;gap:.25rem"><span style="width:10px;height:4px;border-radius:2px;background:#ffca28;display:inline-block"></span>Regular</span>
+          <span style="display:inline-flex;align-items:center;gap:.25rem"><span style="width:10px;height:4px;border-radius:2px;background:#ff5252;display:inline-block"></span>Ruim</span>
+          <span style="display:inline-flex;align-items:center;gap:.25rem"><span style="width:10px;height:4px;border-radius:2px;background:#8896A8;display:inline-block"></span>Sem dado</span>
         </div>
       </div>
-      <div id="icm-map" style="height:400px;width:100%"></div>
+      <div id="icm-map" style="height:100%;min-height:520px;width:100%"></div>
     </div>
-    <div class="card">
-      <div class="card-header"><div class="card-header-icon">📊</div><div class="card-header-title">IRI Médio por Rodovia (m/km)</div></div>
-      <div class="card-body" style="height:380px;position:relative">
-        <canvas id="chartICMIri"></canvas>
-      </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header"><div class="card-header-icon">📊</div><div class="card-header-title">IRI Médio por Rodovia (m/km) — menor = melhor condição</div></div>
+    <div class="card-body" style="height:280px;position:relative">
+      <canvas id="chartICMIri"></canvas>
     </div>
   </div>
 
@@ -1018,27 +1039,36 @@ function iriLabel(iri) {
 // Parsear planilha ICM (API v4 → rows)
 function parsearPlanilhaICM(values) {
   if (!values || values.length < 2) return [];
-  const hdr = values[0].map(h => h.toLowerCase().trim()
+  const hdr = values[0].map(h => (h||'').toLowerCase().trim()
     .replace(/[àáâãä]/g,'a').replace(/[éê]/g,'e').replace(/[í]/g,'i')
     .replace(/[óô]/g,'o').replace(/[ú]/g,'u').replace(/[ç]/g,'c')
     .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,''));
-  const f = n => hdr.indexOf(n);
-  const iRod  = hdr.findIndex(h => h.includes('rodov'));
-  const iIri  = hdr.findIndex(h => h.includes('iri') || h.includes('roughness') || h.includes('indice'));
-  const iKm   = hdr.findIndex(h => h.includes('km') || h.includes('extens') || h.includes('length'));
-  const iBump = hdr.findIndex(h => h.includes('bump') || h.includes('obstac'));
-  const iCond = hdr.findIndex(h => h.includes('cond') || h.includes('classif'));
-  const iLocal= hdr.findIndex(h => h.includes('local') || h.includes('trecho') || h.includes('municipio'));
+  console.log('[ICM planilha] cabeçalho:', hdr);
+  const iRod  = hdr.findIndex(h => h.includes('rodov') || h.includes('via') || h === 'am');
+  const iIri  = hdr.findIndex(h => h.includes('iri') || h.includes('roughness') || h.includes('indice') || h.includes('irm'));
+  const iKm   = hdr.findIndex(h => h.includes('km') || h.includes('extens') || h.includes('length') || h.includes('metro'));
+  const iBump = hdr.findIndex(h => h.includes('bump') || h.includes('obstac') || h.includes('solavanco'));
+  const iCond = hdr.findIndex(h => h.includes('cond') || h.includes('classif') || h.includes('situacao'));
+  const iLocal= hdr.findIndex(h => h.includes('local') || h.includes('trecho') || h.includes('municipio') || h.includes('via_'));
+  // Detectar se a coluna de comprimento está em metros (valores típicos > 500)
+  const amostra = values.slice(1,6)
+    .map(row => parseFloat((row[iKm]||'0').replace(',','.')))
+    .filter(v => v > 0);
+  const mediaAmostra = amostra.length ? amostra.reduce((a,b)=>a+b,0)/amostra.length : 0;
+  const estaEmMetros = mediaAmostra > 500; // se média > 500, provavelmente em metros
+  console.log('[ICM planilha] média km:', mediaAmostra, '→ em metros?', estaEmMetros);
   const resultado = [];
   values.slice(1).forEach(row => {
     const rod  = (row[iRod]  || '').trim();
     const iriV = parseFloat((row[iIri]  || '0').replace(',','.')) || 0;
-    const km   = parseFloat((row[iKm]   || '0').replace(',','.')) || 0;
+    let km     = parseFloat((row[iKm]   || '0').replace(',','.')) || 0;
+    if (estaEmMetros) km = km / 1000; // converter metros → km
     const bump = parseInt(row[iBump]    || '0') || 0;
     const cond = row[iCond] || '';
-    const loc  = row[iLocal] || '';
+    const loc  = iLocal >= 0 ? (row[iLocal] || '') : '';
     if (!rod || !iriV) return;
-    resultado.push({ road: rod, iri: iriV, km, bumps: bump,
+    console.log('[ICM planilha] row:', rod, iriV, km);
+    resultado.push({ road: rod, iri: iriV, km: Math.round(km*10)/10, bumps: bump,
       cond_label: cond || iriLabel(iriV),
       cond_color: iriCor(iriV), local: loc });
   });
@@ -1161,6 +1191,47 @@ function renderICMMapRico(icmByRoad) {
 // renderICMMap mantido como alias para compatibilidade
 function renderICMMap(data) { /* usa renderICMMapRico */ }
 
+// Renderizar lista de rodovias na sidebar ICM
+let icmAllData = [];
+let icmFiltroAtual = 'all';
+function renderICMList(data) {
+  icmAllData = data;
+  const listEl = el('icm-road-list');
+  const countEl = el('icm-road-count');
+  if (!listEl) return;
+  const filtered = icmFiltroAtual === 'all' ? data : data.filter(r => r.cond === icmFiltroAtual);
+  if (countEl) countEl.textContent = filtered.length;
+  listEl.innerHTML = filtered.sort((a,b)=>b.iri-a.iri).map(r =>
+    `<div class="icm-road-item" onclick="icmDestacarRodovia('${r.road}')">
+      <span class="ri-dot" style="background:${r.cond_color}"></span>
+      <span class="ri-name">${r.road}</span>
+      <span class="ri-km">${r.km} km</span>
+      <span class="ri-iri" style="color:${r.cond_color}">${r.iri.toFixed(2)}</span>
+    </div>`
+  ).join('');
+}
+function icmFiltrar(btn) {
+  document.querySelectorAll('.icm-fpill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  icmFiltroAtual = btn.dataset.f;
+  renderICMList(icmAllData);
+}
+function icmDestacarRodovia(road) {
+  if (icmMap) {
+    // Fly to road bounds se disponível
+    let bounds = null;
+    GEO_ICM.forEach(feat => {
+      if (feat.props && feat.props.road === road) {
+        feat.lines.forEach(line => {
+          const ll = L.latLngBounds(line.map(p=>[p[0],p[1]]));
+          if (!bounds) bounds = ll; else bounds.extend(ll);
+        });
+      }
+    });
+    if (bounds) icmMap.flyToBounds(bounds, {padding:[30,30], duration:.8});
+  }
+}
+
 // Renderizar tabela ICM
 function renderICMTabela(data) {
   const tbody = el('icm-tbody');
@@ -1203,6 +1274,7 @@ async function carregarICM() {
       cond_color: COND_COR[cond]||'#8896A8', local: entries[0].local||'' };
   }).sort((a,b) => a.road.localeCompare(b.road));
   renderICMKpis(summaryData);
+  renderICMList(summaryData);
   renderICMChart(summaryData);
   setTimeout(() => renderICMMapRico(icmByRoad), 100);
   renderICMTabela(summaryData);
@@ -1215,6 +1287,7 @@ async function carregarICM() {
       const planData = parsearPlanilhaICM(jsonData.values);
       if (planData.length > 0) {
         renderICMKpis(planData);
+        renderICMList(planData);
         renderICMChart(planData);
         renderICMTabela(planData);
       }
