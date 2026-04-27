@@ -421,12 +421,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 // VERSÃO 3.4 – CORREÇÃO DA EXTENSÃO TOTAL (SOMA DIRETA DE TODOS OS TRECHOS)
-const SPREADSHEET_ID  = '17C0uCIPesYC_L4Tq41eFI_4rXSVJHAKN';
+const SPREADSHEET_ID  = '1bYf2anVF4un84-lusSOeSRaNLiod9fq0joUEnbgHxnM';
 const API_KEY         = 'AIzaSyDaitkJNDTZi3BMFAe9u4wV6U-DIgUS7NA';
 const RANGE           = 'A:S';
 const BASE_URL        = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
 const GEOJSON_URL     = 'https://raw.githubusercontent.com/leonzordhue/seinfra-rodovias/main/RODOVIAS_ESTADUAIS_AMAZONAS.geojson';
-const CONTRATOS_CSV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1gPu9G-nlHF_3d_wP10bgczuYMnR1gEZYcUkFE5N5_WetTkWH3aacrMB0blP-7gESBrtouF5gI5Yb/pub?gid=997762507&single=true&output=csv';
+const GERAL_ID        = '1LJTtvldaYyHuMnsF04gim2eZPhIqzy5CbEnOZ1zTCoM';
+const GERAL_GID       = '724762331';
+const CONTRATOS_CSV   = `https://docs.google.com/spreadsheets/d/${GERAL_ID}/gviz/tq?tqx=out:csv&gid=${GERAL_GID}`;
 const SINISTROS_SHEET = '1y7h-FRn0jBfhlr9e7EwDBNES-0hCUhSeAf5s4tVEWxE';
 const SINISTROS_URL   = `https://docs.google.com/spreadsheets/d/${SINISTROS_SHEET}/gviz/tq?tqx=out:csv&sheet=Noticias`;
 
