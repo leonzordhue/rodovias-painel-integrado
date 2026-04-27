@@ -501,9 +501,8 @@ function badgeTipo(tipo) {
   return `<span class="badge-tipo out">${tipo||'—'}</span>`;
 }
 function formatMoney(value) {
-  if (value >= 1e9) return (value / 1e9).toFixed(1).replace('.',',') + ' B';
-  if (value >= 1e6) return (value / 1e6).toFixed(0).replace('.',',') + ' M';
-  return value.toLocaleString('pt-BR', {style:'currency', currency:'BRL', minimumFractionDigits:2});
+  if (!value) return 'R$ 0,00';
+  return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -536,8 +535,8 @@ async function carregarRodovias() {
       inicio:       cabecalho.findIndex(c => c.includes('Início')),
       final:        cabecalho.findIndex(c => c.includes('Final')),
       revestimento: cabecalho.findIndex(c => c.includes('Tipo de Revestimento')),
-      faixaDominio: 11,
-      pavimentacao: 16,
+      faixaDominio: cabecalho.findIndex(c => c.toLowerCase().includes('faixa') || c.toLowerCase().includes('dom')),
+      pavimentacao: cabecalho.findIndex(c => c.toLowerCase().includes('situação') || c.toLowerCase().includes('situacao') || c.toLowerCase().includes('paviment')),
       situacao:     cabecalho.findIndex(c => c.toLowerCase().includes('situação') || c.toLowerCase().includes('situacao')),
     };
     todasRodovias = [];
@@ -692,13 +691,29 @@ function extrairCodigoRodovia(nomeRodovia) {
   const match = nomeRodovia.match(/AM[\-\/]?(\d+)/i);
   if (!match) return null;
   const num = match[1];
-  return { num, pattern: new RegExp(`RODOVIA\\s+AM-?${num}`, 'i') };
+  // Busca ampla: AM-240, AM 240, AM240, 240EAM, em qualquer posição
+  const pattern = new RegExp('AM[\\-\\/\\s]?0*' + num + '(?!\\d)', 'i');
+  return { num, pattern };
 }
 function obterContratosRodovia(nomeRodovia) {
   if (!todosContratos.length) return [];
   const cod = extrairCodigoRodovia(nomeRodovia);
   if (!cod) return [];
-  return todosContratos.filter(c => cod.pattern.test(c.resumo) || cod.pattern.test(c.nomeObj));
+  // Apelidos por número de rodovia
+  const apelidos = { '450': ['anel sul'], '356': ['anel viário', 'anel viario'] };
+  const extra = apelidos[cod.num] || [];
+  const matched = todosContratos.filter(c => {
+    const txt = (c.resumo + ' ' + c.nomeObj).toLowerCase();
+    if (cod.pattern.test(txt)) return true;
+    return extra.some(a => txt.includes(a));
+  });
+  // Deduplicar por número de contrato — manter o de maior valor
+  const seen = {};
+  matched.forEach(c => {
+    const key = c.contrato || (c.nome.substring(0,40) + c.empresa);
+    if (!seen[key] || c.valor > seen[key].valor) seen[key] = c;
+  });
+  return Object.values(seen);
 }
 function carregarContratosPorRodovia(nome) {
   const contratos = obterContratosRodovia(nome);
@@ -723,9 +738,34 @@ function aplicarFiltroContratos() {
   if (totalSpan) totalSpan.textContent = formatMoney(totalFiltrado);
   const container = el('contratosRodovia');
   if (!filtrados.length) { container.innerHTML = `<div class="contratos-sem-dados">Nenhum contrato ${currentContratoFilter !== 'todos' ? 'com situação "'+currentContratoFilter+'" ' : ''}encontrado.</div>`; return; }
-  container.innerHTML = filtrados.map(c => `<div class="contrato-card"><div class="contrato-header"><div><div class="contrato-num">${c.contrato||'S/N'}</div><div class="contrato-nome">${c.nome}</div></div><div>${chipStatus(c.status)}</div></div><div class="contrato-meta"><div><div class="contrato-meta-label">Empresa</div><div class="contrato-meta-value">${c.empresa||'—'}</div></div><div><div class="contrato-meta-label">Valor Global</div><div class="contrato-meta-value">${formatMoney(c.valor)}</div></div><div><div class="contrato-meta-label">Município</div><div class="contrato-meta-value">${c.municipio||'—'}</div></div></div>${c.avFisico>0?`<div class="contrato-progress"><div class="progress-header"><span>Avanço Físico</span><span>${Math.round(c.avFisico)}%</span></div><div class="progress-bg"><div class="progress-fill ${c.avFisico<30?'low':c.avFisico>=80?'high':''}" style="width:${Math.min(100,c.avFisico)}%"></div></div></div>`:''}</div>`).join('');
+  // Extrai extensão e valor proporcional para contratos multi-rodovia
+  function infoContrato(c) {
+    const num = (currentRodovia.match(/\d+/) || [])[0];
+    const txt = c.resumo + ' ' + c.nomeObj;
+    // Contar rodovias AM distintas no objeto
+    const ams = txt.match(/AM[\-\/\s]?0*\d+/gi) || [];
+    const amsUnicas = [...new Set(ams.map(a => a.replace(/[^\d]/g,'')))];
+    const nRod = Math.max(amsUnicas.length, 1);
+    const valorProp = c.valor / nRod;
+    // Tentar extrair extensão específica desta rodovia no texto
+    // Padrão: "AM-XXX ... XX,XX Km" ou "XXX,XX Km" próximo ao número
+    let extStr = '';
+    if (num) {
+      const re = new RegExp('(?:AM[\\-\\/\\s]?0*' + num + '[^\\d]{0,30}?|' + num + 'EAM\\d+[^\\d]{0,30}?)(\\d{1,4}[.,]\\d{2})\\s*[Kk]m', 'i');
+      const m = re.exec(txt);
+      if (m) extStr = m[1].replace('.',',') + ' km';
+    }
+    return { valorProp, nRod, extStr };
+  }
+  container.innerHTML = filtrados.map(c => {
+    const info = infoContrato(c);
+    const labelValor = info.nRod > 1 ? `Valor proporcional (1/${info.nRod} rodovias)` : 'Valor Global';
+    const extRow = info.extStr ? `<div><div class="contrato-meta-label">Extensão neste trecho</div><div class="contrato-meta-value">${info.extStr}</div></div>` : '';
+    return `<div class="contrato-card"><div class="contrato-header"><div><div class="contrato-num">${c.contrato||'S/N'}</div><div class="contrato-nome">${c.nome}</div></div><div>${chipStatus(c.status)}</div></div><div class="contrato-meta">${extRow}<div><div class="contrato-meta-label">Empresa</div><div class="contrato-meta-value">${c.empresa||'—'}</div></div><div><div class="contrato-meta-label">${labelValor}</div><div class="contrato-meta-value">${formatMoney(info.valorProp)}</div></div><div><div class="contrato-meta-label">Município</div><div class="contrato-meta-value">${c.municipio||'—'}</div></div></div>${c.avFisico>0?`<div class="contrato-progress"><div class="progress-header"><span>Avanço Físico</span><span>${Math.round(c.avFisico)}%</span></div><div class="progress-bg"><div class="progress-fill ${c.avFisico<30?'low':c.avFisico>=80?'high':''}" style="width:${Math.min(100,c.avFisico)}%"></div></div></div>`:''}</div>`;
+  }).join('');
 }
 function mostrarRodovia(nome) {
+  currentRodovia = nome;
   const trechos = todasRodovias.filter(r => r.rodovia === nome);
   const extTotal = trechos.reduce((s,t) => s + t.extensao, 0);
   el('resultadoTitulo').textContent = nome;
