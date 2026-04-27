@@ -464,7 +464,7 @@
   <!-- Gráfico -->
   <div class="card" style="margin-bottom:1rem">
     <div class="card-header"><div class="card-header-icon">📊</div><div class="card-header-title">IRI Médio por Rodovia (m/km) — menor = melhor condição</div></div>
-    <div class="card-body" style="height:280px;position:relative">
+    <div class="card-body" id="icm-chart-wrap" style="height:300px;position:relative">
       <canvas id="chartICMIri"></canvas>
     </div>
   </div>
@@ -1036,43 +1036,53 @@ function iriLabel(iri) {
   return 'Ruim';
 }
 
-// Parsear planilha ICM (API v4 → rows)
+// Parsear planilha ICM (API v4 → rows), agrupado por rodovia
 function parsearPlanilhaICM(values) {
   if (!values || values.length < 2) return [];
-  const hdr = values[0].map(h => (h||'').toLowerCase().trim()
+  const normH = h => (h||'').toLowerCase().trim()
     .replace(/[àáâãä]/g,'a').replace(/[éê]/g,'e').replace(/[í]/g,'i')
     .replace(/[óô]/g,'o').replace(/[ú]/g,'u').replace(/[ç]/g,'c')
-    .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,''));
-  console.log('[ICM planilha] cabeçalho:', hdr);
-  const iRod  = hdr.findIndex(h => h.includes('rodov') || h.includes('via') || h === 'am');
-  const iIri  = hdr.findIndex(h => h.includes('iri') || h.includes('roughness') || h.includes('indice') || h.includes('irm'));
-  const iKm   = hdr.findIndex(h => h.includes('km') || h.includes('extens') || h.includes('length') || h.includes('metro'));
+    .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+  const hdr = values[0].map(normH);
+  const iRod  = hdr.findIndex(h => h.includes('rodov') || h === 'am' || h === 'road');
+  const iIri  = hdr.findIndex(h => h.includes('iri') || h.includes('roughness') || h.includes('irm'));
+  const iKm   = hdr.findIndex(h => h.includes('length') || h.includes('extens') || h.includes('km') || h.includes('metro'));
   const iBump = hdr.findIndex(h => h.includes('bump') || h.includes('obstac') || h.includes('solavanco'));
-  const iCond = hdr.findIndex(h => h.includes('cond') || h.includes('classif') || h.includes('situacao'));
-  const iLocal= hdr.findIndex(h => h.includes('local') || h.includes('trecho') || h.includes('municipio') || h.includes('via_'));
-  // Detectar se a coluna de comprimento está em metros (valores típicos > 500)
-  const amostra = values.slice(1,6)
-    .map(row => parseFloat((row[iKm]||'0').replace(',','.')))
-    .filter(v => v > 0);
-  const mediaAmostra = amostra.length ? amostra.reduce((a,b)=>a+b,0)/amostra.length : 0;
-  const estaEmMetros = mediaAmostra > 500; // se média > 500, provavelmente em metros
-  console.log('[ICM planilha] média km:', mediaAmostra, '→ em metros?', estaEmMetros);
-  const resultado = [];
+  const iLocal= hdr.findIndex(h => h.includes('local') || h.includes('municipio'));
+  if (iRod < 0 || iIri < 0) { console.warn('[ICM planilha] colunas não identificadas', hdr); return []; }
+  // Detectar se comprimento está em metros (amostra das primeiras linhas válidas)
+  const amostra = values.slice(1).slice(0,10)
+    .map(row => parseFloat((row[iKm]||'0').replace(',','.'))).filter(v=>v>0).slice(0,5);
+  const estaEmMetros = amostra.length > 0 && (amostra.reduce((a,b)=>a+b,0)/amostra.length) > 500;
+  console.log('[ICM planilha] hdr:', hdr, '| em metros?', estaEmMetros, '| amostra:', amostra);
+  // Acumular segmentos agrupados por rodovia
+  const porRodovia = {};
   values.slice(1).forEach(row => {
-    const rod  = (row[iRod]  || '').trim();
-    const iriV = parseFloat((row[iIri]  || '0').replace(',','.')) || 0;
-    let km     = parseFloat((row[iKm]   || '0').replace(',','.')) || 0;
-    if (estaEmMetros) km = km / 1000; // converter metros → km
-    const bump = parseInt(row[iBump]    || '0') || 0;
-    const cond = row[iCond] || '';
-    const loc  = iLocal >= 0 ? (row[iLocal] || '') : '';
-    if (!rod || !iriV) return;
-    console.log('[ICM planilha] row:', rod, iriV, km);
-    resultado.push({ road: rod, iri: iriV, km: Math.round(km*10)/10, bumps: bump,
-      cond_label: cond || iriLabel(iriV),
-      cond_color: iriCor(iriV), local: loc });
+    const rod = (row[iRod]||'').trim().toUpperCase().replace(/^AM\s*[-–]?\s*(\d+)/, 'AM-$1');
+    const iriV = parseFloat((row[iIri]||'0').replace(',','.'));
+    let km = iKm >= 0 ? parseFloat((row[iKm]||'0').replace(',','.')) : 0;
+    if (estaEmMetros) km = km / 1000;
+    // Sanidade: segmento > 500 km é erro de dados GPS → ignorar
+    if (!rod || !iriV || km > 500) return;
+    const bump = iBump >= 0 ? (parseInt(row[iBump]||'0')||0) : 0;
+    const loc  = iLocal >= 0 ? (row[iLocal]||'') : '';
+    if (!porRodovia[rod]) porRodovia[rod] = { km:0, iriXkm:0, bumps:0, local:loc, segs:0 };
+    const g = porRodovia[rod];
+    g.km     += km;
+    g.iriXkm += iriV * km;
+    g.bumps  += bump;
+    g.segs++;
+    if (!g.local && loc) g.local = loc;
   });
-  return resultado;
+  // Converter para array com IRI ponderado por extensão
+  return Object.entries(porRodovia).map(([road, g]) => {
+    const iri = g.km > 0 ? g.iriXkm / g.km : 0;
+    const iriR = Math.round(iri*100)/100;
+    const kmR  = Math.round(g.km*10)/10;
+    const cond = iriR < 2 ? 'VeryGood' : iriR < 4 ? 'Good' : iriR < 6 ? 'Fair' : 'Poor';
+    return { road, iri: iriR, km: kmR, bumps: g.bumps,
+      cond, cond_label: COND_LABEL_PT[cond], cond_color: COND_COR[cond], local: g.local };
+  }).sort((a,b) => a.road.localeCompare(b.road));
 }
 
 // Renderizar KPIs ICM
@@ -1100,16 +1110,20 @@ function renderICMChart(data) {
   const ctx = document.getElementById('chartICMIri');
   if (!ctx) return;
   if (chartICMIri) chartICMIri.destroy();
+  // Altura dinâmica: 22px por barra mínimo
+  const wrapEl = el('icm-chart-wrap');
+  if (wrapEl) wrapEl.style.height = Math.max(300, sorted.length * 26) + 'px';
   chartICMIri = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: sorted.map(r => r.road),
       datasets: [{ data: sorted.map(r => r.iri),
         backgroundColor: sorted.map(r => iriCor(r.iri)),
-        borderRadius: 4, borderSkipped: false }]
+        borderRadius: 4, borderSkipped: false, barThickness: 18 }]
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 8, bottom: 8 } },
       plugins: {
         legend: { display: false },
         datalabels: {
@@ -1204,9 +1218,18 @@ function renderICMList(data) {
   listEl.innerHTML = filtered.sort((a,b)=>b.iri-a.iri).map(r =>
     `<div class="icm-road-item" onclick="icmDestacarRodovia('${r.road}')">
       <span class="ri-dot" style="background:${r.cond_color}"></span>
-      <span class="ri-name">${r.road}</span>
-      <span class="ri-km">${r.km} km</span>
-      <span class="ri-iri" style="color:${r.cond_color}">${r.iri.toFixed(2)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="ri-name">${r.road}</span>
+          <span class="ri-iri" style="color:${r.cond_color}">${r.iri.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1px">
+          <span class="ri-km">${r.km} km · ${r.cond_label}</span>
+        </div>
+        <div style="height:3px;background:#E0E6F0;border-radius:2px;margin-top:3px">
+          <div style="height:100%;background:${r.cond_color};border-radius:2px;width:${Math.min(r.iri/10*100,100).toFixed(0)}%"></div>
+        </div>
+      </div>
     </div>`
   ).join('');
 }
