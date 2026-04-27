@@ -412,7 +412,59 @@
   </div>
 
   <!-- ICM -->
-  <div id="tab-icm" class="tab-panel"><div class="card"><div class="card-header"><div class="card-header-icon">🏅</div><div class="card-header-title">Índice de Condição de Manutenção (ICM)</div></div><div class="card-body"><div class="icm-placeholder"><div class="icm-placeholder-icon">🏅</div><div class="icm-placeholder-title">ICM — Em Desenvolvimento</div><div class="icm-placeholder-sub">Este módulo apresentará o Índice de Condição de Manutenção com IRI médio, classificação e gráficos por rodovia. Os dados serão integrados na próxima etapa.</div><div class="icm-badge">Em breve · Próxima versão</div></div></div></div></div>
+  <div id="tab-icm" class="tab-panel">
+  <div id="icm-loading" class="loading-bar show" style="margin-bottom:1rem"><div class="spinner"></div>Carregando dados ICM...</div>
+
+  <!-- KPIs ICM -->
+  <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:1rem">
+    <div class="kpi-box"><div class="kpi-label">Rodovias Analisadas</div><div class="kpi-value" id="icmKpiRods">—</div><div class="kpi-sub">com dados RoadLabPro</div></div>
+    <div class="kpi-box amarelo"><div class="kpi-label">Extensão Medida</div><div class="kpi-value" id="icmKpiKm">—</div><div class="kpi-sub">km levantados em campo</div></div>
+    <div class="kpi-box verde"><div class="kpi-label">IRI Médio Geral</div><div class="kpi-value" id="icmKpiIri">—</div><div class="kpi-sub">m/km (menor = melhor)</div></div>
+    <div class="kpi-box" id="icmKpiCondBox"><div class="kpi-label">Condição Geral</div><div class="kpi-value" id="icmKpiCond">—</div><div class="kpi-sub">classificação DNIT</div></div>
+    <div class="kpi-box vermelho"><div class="kpi-label">Obstáculos Totais</div><div class="kpi-value" id="icmKpiBumps">—</div><div class="kpi-sub">bumps detectados</div></div>
+  </div>
+
+  <!-- Mapa + Gráfico -->
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="card-header" style="padding:.75rem 1rem">
+        <div class="card-header-icon">🗺️</div>
+        <div class="card-header-title">Mapa de Condição da Malha — IRI</div>
+        <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap;font-size:.6rem">
+          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#00b45a;display:inline-block"></span>Muito Bom</span>
+          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#69f0ae;display:inline-block"></span>Bom</span>
+          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#ffca28;display:inline-block"></span>Regular</span>
+          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#ff5252;display:inline-block"></span>Ruim</span>
+          <span style="display:inline-flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;border-radius:2px;background:#8896A8;display:inline-block"></span>Sem dado</span>
+        </div>
+      </div>
+      <div id="icm-map" style="height:400px;width:100%"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-header-icon">📊</div><div class="card-header-title">IRI Médio por Rodovia (m/km)</div></div>
+      <div class="card-body" style="height:380px;position:relative">
+        <canvas id="chartICMIri"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela ICM -->
+  <div class="card">
+    <div class="card-header"><div class="card-header-icon">📋</div><div class="card-header-title">Detalhamento por Rodovia</div></div>
+    <div class="card-body" style="padding:0;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--azul);color:#fff;font-size:.65rem;text-transform:uppercase;letter-spacing:.06em">
+          <th style="padding:.6rem 1rem;text-align:left">Rodovia</th>
+          <th style="padding:.6rem 1rem;text-align:right">km</th>
+          <th style="padding:.6rem 1rem;text-align:right">IRI (m/km)</th>
+          <th style="padding:.6rem 1rem;text-align:center">Condição</th>
+          <th style="padding:.6rem 1rem;text-align:right">Bumps</th>
+          <th style="padding:.6rem 1rem;text-align:left">Trecho</th>
+        </tr></thead>
+        <tbody id="icm-tbody"></tbody>
+      </table>
+    </div>
+  </div></div>
 </div>
 
 <footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><div class="footer-icon">🛣️</div><div><div class="footer-name">SEINFRA<span>/AM</span></div><div class="footer-sub">Secretaria de Estado de Infraestrutura — Amazonas</div></div></div><div class="footer-copy">DMOB · Paulo Esteves Fernandes Neto · 2026</div></div></footer>
@@ -431,6 +483,10 @@ const GERAL_ID        = '1LJTtvldaYyHuMnsF04gim2eZPhIqzy5CbEnOZ1zTCoM';
 const GERAL_GID       = '724762331';
 const CONTRATOS_CSV   = `https://docs.google.com/spreadsheets/d/${GERAL_ID}/gviz/tq?tqx=out:csv&gid=${GERAL_GID}`;
 const SINISTROS_SHEET = '1y7h-FRn0jBfhlr9e7EwDBNES-0hCUhSeAf5s4tVEWxE';
+const ICM_SHEET_ID = '1m9p9nSTwEJJcuIyEXk8KJ8XO9TtzG7spqVUFKC6KBiM';
+const ICM_API_KEY  = 'AIzaSyBY4SuXjhe6hI4vLhwjplsFR9AMvPxqbe0';
+const ICM_GID      = '1165654835';
+const ICM_API_URL  = `https://sheets.googleapis.com/v4/spreadsheets/${ICM_SHEET_ID}/values/A:ZZ?key=${ICM_API_KEY}`;
 const SINISTROS_URL   = `https://docs.google.com/spreadsheets/d/${SINISTROS_SHEET}/gviz/tq?tqx=out:csv&sheet=Noticias`;
 
 let todasRodovias = [], geoJsonData = null, todosContratos = [], todosSinistros = [];
@@ -511,6 +567,7 @@ function switchTab(id, btn) {
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
   if (id === 'consulta' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 100);
+  if (id === 'icm') carregarICM();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -647,7 +704,7 @@ async function carregarContratos() {
       const avF = parseFloat(valAt(row, I.avFisico).replace(/[%\s]/g,'').replace(',','.')) || 0;
       return {
         contrato: valAt(row, I.contrato),
-        nome: (valAt(row, I.nome)||'').replace(/https?:\/\/[^\s,]*/gi,'').replace(/,\s*,/g,',').replace(/[,.]\s*$/,'').trim(),
+        nome: (function(s){return (s||'').replace(/https?:\/\/[^\s,]*/gi,'').split(/,\s*0\s*,|,,/)[0].replace(/[,;.\s]+$/,'').trim();})(valAt(row, I.nome)),
         municipio: valAt(row, I.municipio),
         statusRaw, status,
         empresa: valAt(row, I.empresa),
@@ -727,14 +784,17 @@ function obterContratosRodovia(nomeRodovia) {
   ];
   const matched = todosContratos.filter(c => {
     const txt = (c.resumo + ' ' + c.nomeObj).toLowerCase();
-    // Verificar match principal
-    let match = cod.pattern.test(txt) || extra.some(a => txt.includes(a));
-    if (!match) return false;
-    // Excluir falsos positivos: AM-XXX aparece só como referência de endereço
+    const matchPrincipal = cod.pattern.test(txt);
+    const matchAlias = extra.some(a => txt.includes(a));
+    if (!matchPrincipal && !matchAlias) return false;
     if (falsoPosPatterns.some(p => p.test(txt))) {
-      // Ainda incluir se AM-XXX aparece MÚLTIPLAS vezes (obra mesmo que menciona localização)
       const mencoes = (txt.match(cod.pattern) || []).length;
       if (mencoes < 2) return false;
+    }
+    // Alias sem AM explícito + outra estrada nomeada = falso positivo
+    if (!matchPrincipal && matchAlias) {
+      const temEstradaNomeada = /\b(?:estrada|rua|avenida|av\.)\s+(?:do|da|de|dos|das)?\s*[a-záàâãéêíóôõú]/i.test(txt);
+      if (temEstradaNomeada) return false;
     }
     return true;
   });
@@ -926,6 +986,193 @@ function renderTop3Sinistros() {
   const maxC = top3[0]?.[1] || 1;
   if (!top3.length) { el('top3Sinis').innerHTML = '<p>Sem dados</p>'; return; }
   el('top3Sinis').innerHTML = top3.map(([rod,cnt]) => `<div class="top3-item"><div class="top3-header"><span class="top3-label">${rod}</span><span class="top3-value">${cnt} ocorrências</span></div><div class="top3-bar-bg"><div class="top3-bar-fill" style="width:${Math.round((cnt/maxC)*100)}%;background:#C0392B"></div></div></div>`).join('');
+}
+
+// ────────────────────────────────────────────────────────────────
+// ICM — ÍNDICE DE CONDIÇÃO DA MALHA
+// Fonte: _ICM_SUMMARY (embutido) + planilha via API v4
+// ────────────────────────────────────────────────────────────────
+let icmCarregado = false;
+let icmMap = null;
+let chartICMIri = null;
+
+function iriCor(iri) {
+  if (iri === null || iri === undefined || isNaN(iri)) return '#8896A8';
+  if (iri < 2) return '#00b45a';
+  if (iri < 4) return '#69f0ae';
+  if (iri < 6) return '#ffca28';
+  return '#ff5252';
+}
+function iriLabel(iri) {
+  if (iri === null || isNaN(iri)) return 'Sem dado';
+  if (iri < 2) return 'Muito Bom';
+  if (iri < 4) return 'Bom';
+  if (iri < 6) return 'Regular';
+  return 'Ruim';
+}
+
+// Parsear planilha ICM (API v4 → rows)
+function parsearPlanilhaICM(values) {
+  if (!values || values.length < 2) return [];
+  const hdr = values[0].map(h => h.toLowerCase().trim()
+    .replace(/[àáâãä]/g,'a').replace(/[éê]/g,'e').replace(/[í]/g,'i')
+    .replace(/[óô]/g,'o').replace(/[ú]/g,'u').replace(/[ç]/g,'c')
+    .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,''));
+  const f = n => hdr.indexOf(n);
+  const iRod  = hdr.findIndex(h => h.includes('rodov'));
+  const iIri  = hdr.findIndex(h => h.includes('iri') || h.includes('roughness') || h.includes('indice'));
+  const iKm   = hdr.findIndex(h => h.includes('km') || h.includes('extens') || h.includes('length'));
+  const iBump = hdr.findIndex(h => h.includes('bump') || h.includes('obstac'));
+  const iCond = hdr.findIndex(h => h.includes('cond') || h.includes('classif'));
+  const iLocal= hdr.findIndex(h => h.includes('local') || h.includes('trecho') || h.includes('municipio'));
+  const resultado = [];
+  values.slice(1).forEach(row => {
+    const rod  = (row[iRod]  || '').trim();
+    const iriV = parseFloat((row[iIri]  || '0').replace(',','.')) || 0;
+    const km   = parseFloat((row[iKm]   || '0').replace(',','.')) || 0;
+    const bump = parseInt(row[iBump]    || '0') || 0;
+    const cond = row[iCond] || '';
+    const loc  = row[iLocal] || '';
+    if (!rod || !iriV) return;
+    resultado.push({ road: rod, iri: iriV, km, bumps: bump,
+      cond_label: cond || iriLabel(iriV),
+      cond_color: iriCor(iriV), local: loc });
+  });
+  return resultado;
+}
+
+// Renderizar KPIs ICM
+function renderICMKpis(data) {
+  const total = data.length;
+  const kmT   = data.reduce((s,r) => s + (r.km||0), 0);
+  const iriM  = kmT > 0 ? data.reduce((s,r) => s + r.iri*(r.km||1), 0) / kmT : 0;
+  const bumps = data.reduce((s,r) => s + (r.bumps||0), 0);
+  const cor   = iriCor(iriM);
+  const lbl   = iriLabel(iriM);
+  el('icmKpiRods').textContent  = total;
+  el('icmKpiKm').textContent    = kmT.toLocaleString('pt-BR',{minimumFractionDigits:1}) + ' km';
+  el('icmKpiIri').textContent   = iriM.toFixed(2);
+  el('icmKpiCond').textContent  = lbl;
+  el('icmKpiBumps').textContent = bumps.toLocaleString('pt-BR');
+  const condBox = el('icmKpiCondBox');
+  if (condBox) condBox.style.borderLeftColor = cor;
+  const condVal = el('icmKpiCond');
+  if (condVal) condVal.style.color = cor;
+}
+
+// Renderizar gráfico IRI horizontal
+function renderICMChart(data) {
+  const sorted = [...data].sort((a,b) => b.iri - a.iri);
+  const ctx = document.getElementById('chartICMIri');
+  if (!ctx) return;
+  if (chartICMIri) chartICMIri.destroy();
+  chartICMIri = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(r => r.road),
+      datasets: [{ data: sorted.map(r => r.iri),
+        backgroundColor: sorted.map(r => iriCor(r.iri)),
+        borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'end', align: 'end', offset: 4, font: { size: 10, weight: '700' },
+          color: '#1A2540',
+          formatter: v => v.toFixed(2) + ' m/km'
+        }
+      },
+      scales: {
+        x: { min: 0, max: 10, grid: { color: '#E0E6F0' },
+          title: { display: true, text: 'IRI (m/km) — menor = melhor', font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' } } }
+      }
+    }
+  });
+}
+
+// Renderizar mapa ICM (Leaflet)
+function renderICMMap(data) {
+  const mapEl = el('icm-map');
+  if (!mapEl) return;
+  if (icmMap) { icmMap.remove(); icmMap = null; }
+  icmMap = L.map('icm-map', { center: [-4.5, -63.0], zoom: 6, attributionControl: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(icmMap);
+  // Criar lookup IRI por rodovia
+  const icmByRoad = {};
+  data.forEach(r => { icmByRoad[r.road] = r; });
+  // Pintar o GeoJSON com as cores do ICM
+  let bounds = null;
+  if (_GEO_DATA && _GEO_DATA.length) {
+    _GEO_DATA.forEach(seg => {
+      if (!seg.lines || !seg.lines.length) return;
+      const road = seg.props && seg.props.road;
+      const icmInfo = road ? icmByRoad[road] : null;
+      const cor = icmInfo ? iriCor(icmInfo.iri) : '#8896A8';
+      const peso = icmInfo ? 5 : 3;
+      const latlngs = seg.lines.map(p => [p[0], p[1]]);
+      const popup = road
+        ? `<b style="font-family:Outfit">${road}</b>${icmInfo ? `<br>IRI: ${icmInfo.iri.toFixed(2)} m/km<br><b>${icmInfo.cond_label}</b>` : '<br><i>Sem dado ICM</i>'}`
+        : 'Segmento';
+      L.polyline(latlngs, { color: cor, weight: peso, opacity: .85 })
+        .addTo(icmMap).bindPopup(popup);
+      if (!bounds) bounds = L.latLngBounds(latlngs);
+      else bounds.extend(latlngs);
+    });
+    if (bounds) icmMap.fitBounds(bounds, { padding: [20, 20] });
+  }
+}
+
+// Renderizar tabela ICM
+function renderICMTabela(data) {
+  const tbody = el('icm-tbody');
+  if (!tbody) return;
+  const sorted = [...data].sort((a,b) => b.iri - a.iri);
+  tbody.innerHTML = sorted.map((r, i) => {
+    const bg = i % 2 === 0 ? '' : 'background:var(--cinza-bg)';
+    const chip = `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:700;padding:.2em .6em;border-radius:6px;background:${r.cond_color}22;color:${r.cond_color}">${r.cond_label||iriLabel(r.iri)}</span>`;
+    return `<tr style="${bg}">
+      <td style="padding:.55rem 1rem;font-weight:700;color:var(--azul)">${r.road}</td>
+      <td style="padding:.55rem 1rem;text-align:right">${(r.km||0).toFixed(1)}</td>
+      <td style="padding:.55rem 1rem;text-align:right;font-weight:700;color:${iriCor(r.iri)}">${r.iri.toFixed(2)}</td>
+      <td style="padding:.55rem 1rem;text-align:center">${chip}</td>
+      <td style="padding:.55rem 1rem;text-align:right">${(r.bumps||0).toLocaleString('pt-BR')}</td>
+      <td style="padding:.55rem 1rem;font-size:.75rem;color:var(--cinza-aux)">${r.local||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Carregar ICM — entry point
+async function carregarICM() {
+  if (icmCarregado) return;
+  icmCarregado = true;
+  const ld = el('icm-loading');
+  // Usar dados embutidos como base imediata
+  if (_ICM_SUMMARY && _ICM_SUMMARY.length) {
+    renderICMKpis(_ICM_SUMMARY);
+    renderICMChart(_ICM_SUMMARY);
+    setTimeout(() => renderICMMap(_ICM_SUMMARY), 100);
+    renderICMTabela(_ICM_SUMMARY);
+  }
+  if (ld) ld.classList.remove('show');
+  // Tentar enriquecer com dados da planilha ICM
+  try {
+    const resp = await fetch(ICM_API_URL);
+    if (resp.ok) {
+      const json = await resp.json();
+      const planData = parsearPlanilhaICM(json.values);
+      if (planData.length > 0) {
+        renderICMKpis(planData);
+        renderICMChart(planData);
+        setTimeout(() => renderICMMap(planData), 100);
+        renderICMTabela(planData);
+      }
+    }
+  } catch(e) { console.warn('[ICM planilha]', e.message); }
+  // Ajustar mapa após render
+  setTimeout(() => { if (icmMap) icmMap.invalidateSize(); }, 300);
 }
 </script>
 </body>
