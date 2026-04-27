@@ -235,7 +235,7 @@
     .contrato-card:last-child { margin-bottom: 0; }
     .contrato-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .6rem; flex-wrap: wrap; }
     .contrato-num { font-size: .72rem; font-weight: 800; color: var(--cinza-aux); letter-spacing: .06em; text-transform: uppercase; }
-    .contrato-nome { font-size: .9rem; font-weight: 700; color: var(--cinza-txt); margin-bottom: .5rem; line-height: 1.4; }
+    .contrato-nome { font-size: .9rem; font-weight: 700; color: var(--cinza-txt); margin-bottom: .5rem; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; }
     .contrato-meta { display: flex; gap: 1.5rem; flex-wrap: wrap; }
     .contrato-meta-label { font-size: .6rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza-aux); }
     .contrato-meta-value { font-size: .82rem; font-weight: 700; color: var(--cinza-txt); }
@@ -352,6 +352,7 @@
       <div class="kpi-box verde"><div class="kpi-label">Pavimentada</div><div class="kpi-value" id="kpiExtPav">—</div><div class="kpi-sub">km pavimentados</div></div>
       <div class="kpi-box"><div class="kpi-label">Contratos Ativos</div><div class="kpi-value" id="kpiContrAtivos">—</div><div class="kpi-sub">andamento + paralisado</div></div>
       <div class="kpi-box amarelo"><div class="kpi-label">Total Investido</div><div class="kpi-value" id="kpiTotalInvest">—</div><div class="kpi-sub">excluídos rescindidos e ramais</div></div>
+      <div class="kpi-box verde"><div class="kpi-label">Ext. Serviços Realizados</div><div class="kpi-value" id="kpiExtServicos">—</div><div class="kpi-sub">km concluídos + inaugurados</div></div>
     </div>
     <div class="chart-grid-2">
       <div class="chart-card"><div class="chart-title">📏 Extensão por Situação Física (km)</div><div class="chart-wrap" style="height:220px"><canvas id="chartExt"></canvas></div></div>
@@ -646,7 +647,7 @@ async function carregarContratos() {
       const avF = parseFloat(valAt(row, I.avFisico).replace(/[%\s]/g,'').replace(',','.')) || 0;
       return {
         contrato: valAt(row, I.contrato),
-        nome: valAt(row, I.nome),
+        nome: (valAt(row, I.nome)||'').replace(/https?:\/\/[^\s,]*/gi,'').replace(/,\s*,/g,',').replace(/[,.]\s*$/,'').trim(),
         municipio: valAt(row, I.municipio),
         statusRaw, status,
         empresa: valAt(row, I.empresa),
@@ -668,6 +669,19 @@ function renderKpisContratos() {
   const totalVal = todosContratos.reduce((s,c) => s + c.valor, 0);
   el('kpiContrAtivos').textContent = ativos;
   el('kpiTotalInvest').textContent = formatMoney(totalVal);
+  // Extensão total de serviços realizados: soma os km extraídos dos objetos concluídos/inaugurados
+  const reKm = /(\d{1,4}[.,]\d{2})\s*[Kk][Mm]/g;
+  let extServicos = 0;
+  todosContratos.filter(c => c.status === 'concluido' || c.status === 'inaugurado').forEach(c => {
+    const txt = c.resumo || c.nomeObj || '';
+    let m; reKm.lastIndex = 0;
+    while ((m = reKm.exec(txt)) !== null) {
+      const v = parseFloat(m[1].replace(',','.'));
+      if (v > 0 && v < 5000) extServicos += v; // sanidade: < 5000 km por entrada
+    }
+  });
+  const elServicos = el('kpiExtServicos');
+  if (elServicos) elServicos.textContent = extServicos.toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' km';
   const counts = { andamento:0, paralisado:0, concluido:0 };
   todosContratos.forEach(c => { if (c.status === 'andamento') counts.andamento++; else if (c.status === 'paralisado') counts.paralisado++; else if (c.status === 'concluido') counts.concluido++; });
   const ctxC = document.getElementById('chartContr').getContext('2d');
@@ -702,10 +716,27 @@ function obterContratosRodovia(nomeRodovia) {
   // Apelidos por número de rodovia
   const apelidos = { '450': ['anel sul'], '356': ['anel viário', 'anel viario'] };
   const extra = apelidos[cod.num] || [];
+  // Padrões que indicam referência de localização, não objeto da obra
+  const falsoPosPatterns = [
+    /localizada\s+no\s+km/i,          // "Estrada X, localizada no KM-18 da AM-070"
+    /localizado\s+no\s+km/i,
+    /no\s+km[\s\-]\d+[\s,]+da\s+am/i, // "no KM 40 da AM-352, Comunidade"
+    /acesso\s+[àa]\s+ponte/i,          // "acesso à ponte... e sinalização da AM-070"
+    /viaduto/i,                           // obras de arte especial (viadutos)
+    /obra\s+de\s+arte/i,
+  ];
   const matched = todosContratos.filter(c => {
     const txt = (c.resumo + ' ' + c.nomeObj).toLowerCase();
-    if (cod.pattern.test(txt)) return true;
-    return extra.some(a => txt.includes(a));
+    // Verificar match principal
+    let match = cod.pattern.test(txt) || extra.some(a => txt.includes(a));
+    if (!match) return false;
+    // Excluir falsos positivos: AM-XXX aparece só como referência de endereço
+    if (falsoPosPatterns.some(p => p.test(txt))) {
+      // Ainda incluir se AM-XXX aparece MÚLTIPLAS vezes (obra mesmo que menciona localização)
+      const mencoes = (txt.match(cod.pattern) || []).length;
+      if (mencoes < 2) return false;
+    }
+    return true;
   });
   // Deduplicar por número de contrato — manter o de maior valor
   const seen = {};
