@@ -307,7 +307,17 @@
     .footer-copy { font-size: .68rem; color: var(--cinza-aux); }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
     @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+
+    .icm-road-item { display:flex;align-items:flex-start;gap:.65rem;padding:.9rem;border-bottom:1.5px solid var(--borda);cursor:pointer;transition:background .12s; }
+    .icm-road-item:hover { background:var(--azul-claro); }
+    .icm-road-item .ri-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px; }
+    .icm-road-item .ri-name { font-size:.85rem;font-weight:800;color:var(--azul); }
+    .icm-road-item .ri-iri { font-weight:800;font-size:.8rem;white-space:nowrap; }
+    .icm-road-item .ri-km { color:var(--cinza-aux);font-size:.65rem; }
+    .icm-road-item .ri-cond { font-size:.62rem;font-weight:600; }
+    .icm-fpill { font-size:.6rem;font-weight:700;padding:.25em .6em;border-radius:100px;border:1px solid var(--borda);background:var(--cinza-bg);cursor:pointer;transition:.15s; }
+    .icm-fpill.active { background:var(--azul);color:#fff;border-color:var(--azul); }
+      </style>
 </head>
 <body>
 <header class="gov-header">
@@ -762,7 +772,14 @@ async function carregarContratos() {
         nomeObj: (valAt(row, I.nome) || '').toUpperCase(),
         extensaoKm: (function(txt){ var m=(txt||'').match(/(\d{1,4}(?:[.,]\d{1,2})?)\s*km/i); if(!m)return null; var v=parseFloat(m[1].replace(',','.')); return(!isNaN(v)&&v>0&&v<5000)?v:null; })((valAt(row,I.nome)||'')+(valAt(row,I.resumo)||'')),
       };
-    }).filter(c => c !== null && c.nome);
+    }).filter(c => {
+      if (!c || !c.nome) return false;
+      // Exigir número de contrato reconhecível (CT-, Convênio, nº)
+      const hasContractNum = c.contrato && /CT-|conv[eê]nio|n[oº°]\s*\d|proc/i.test(c.contrato);
+      // Ou valor > 0 com empresa preenchida (contrato legítimo sem número formatado)
+      const hasValue = c.valor > 0 && c.empresa && c.empresa.length > 2;
+      return hasContractNum || hasValue;
+    })
     console.log(`Contratos: ${todosContratos.length}`);
     contratosCarregados = true;
     renderKpisContratos();
@@ -818,42 +835,53 @@ function extrairCodigoRodovia(nomeRodovia) {
 }
 function obterContratosRodovia(nomeRodovia) {
   if (!todosContratos.length) return [];
+  const nomeUp = nomeRodovia.toUpperCase().trim();
+  // ── AM-450: hardcoded — busca por "ANEL SUL" excluindo apenas o viaduto Lydia
+  if (nomeUp === 'AM-450') {
+    const seen450 = {};
+    todosContratos.filter(c => {
+      const txt = c.nomeObj + ' ' + c.resumo;
+      return txt.includes('ANEL SUL') && !txt.includes('VIADUTO LYDIA') && !txt.includes('VIADUTO LŸDIA');
+    }).forEach(c => {
+      const key = c.contrato || (c.nome.substring(0,40) + c.empresa);
+      if (!seen450[key] || c.valor > seen450[key].valor) seen450[key] = c;
+    });
+    return Object.values(seen450);
+  }
   const cod = extrairCodigoRodovia(nomeRodovia);
   if (!cod) return [];
-  // Apelidos por número de rodovia
-  const apelidos = { '450': ['anel sul'], '356': ['anel viário', 'anel viario'] };
-  // Para alias "anel sul" na AM-450: excluir sinalização e viadutos (não são obras de rodovia)
-  const excluirSeAlias = /viaduto|obra de arte especial|^prestação.*sinaliza/i;
-  const extra = apelidos[cod.num] || [];
-  // Padrões que indicam referência de localização, não objeto da obra
+  // Aliases EXCLUSIVOS: nome histórico/popular que identifica a rodovia univocamente
+  // → falsoPosPatterns NÃO se aplica (o alias confirma que o contrato é dessa rodovia)
+  const aliasExclusivo = { '151': ['carlos braga', 'estrada carlos braga'] };
+  // Aliases GENÉRICOS: podem ter falsos positivos, aplicar verificação adicional
+  const aliasGenerico = { '356': ['anel viário', 'anel viario'] };
+  const extraExcl = aliasExclusivo[cod.num] || [];
+  const extraGen  = aliasGenerico[cod.num]  || [];
   const falsoPosPatterns = [
-    /localizada\s+no\s+km/i,          // "Estrada X, localizada no KM-18 da AM-070"
+    /localizada\s+no\s+km/i,
     /localizado\s+no\s+km/i,
-    /no\s+km[\s\-]\d+[\s,]+da\s+am/i, // "no KM 40 da AM-352, Comunidade"
-    /acesso\s+[àa]\s+ponte/i,          // "acesso à ponte... e sinalização da AM-070"
-    /viaduto/i,                           // obras de arte especial (viadutos)
+    /no\s+km[\s\-]\d+[\s,]+da\s+am/i,
+    /acesso\s+[àa]\s+ponte/i,
+    /viaduto/i,
     /obra\s+de\s+arte/i,
   ];
-  const matched = todosContratos.filter(c => {
+  const seen = {};
+  todosContratos.forEach(c => {
     const txt = (c.resumo + ' ' + c.nomeObj).toLowerCase();
     const matchPrincipal = cod.pattern.test(txt);
-    const matchAlias = extra.some(a => txt.includes(a));
-    if (!matchPrincipal && !matchAlias) return false;
-    if (falsoPosPatterns.some(p => p.test(txt))) {
-      const mencoes = (txt.match(cod.pattern) || []).length;
-      if (mencoes < 2) return false;
+    const matchExcl      = extraExcl.some(a => txt.includes(a));
+    const matchGen       = extraGen.some(a => txt.includes(a));
+    if (!matchPrincipal && !matchExcl && !matchGen) return;
+    // Alias exclusivo confirma a rodovia → não bloquear por falsoPosPatterns
+    if (!matchExcl) {
+      if (falsoPosPatterns.some(p => p.test(txt))) {
+        if ((txt.match(cod.pattern) || []).length < 2) return;
+      }
     }
-    // Alias sem AM explícito + outra estrada nomeada = falso positivo
-    if (!matchPrincipal && matchAlias) {
-      const temEstradaNomeada = /\b(?:estrada|rua|avenida|av\.)\s+(?:do|da|de|dos|das)?\s*[a-záàâãéêíóôõú]/i.test(txt);
-      if (temEstradaNomeada) return false;
-      if (excluirSeAlias && excluirSeAlias.test(txt)) return false;
+    // Alias genérico + estrada nomeada sem código explícito = falso positivo
+    if (matchGen && !matchPrincipal && !matchExcl) {
+      if (/\b(?:estrada|rua|avenida|av\.)\s+[a-záàâãéê]/i.test(txt)) return;
     }
-    return true;
-  });
-  // Deduplicar por número de contrato — manter o de maior valor
-  const seen = {};
-  matched.forEach(c => {
     const key = c.contrato || (c.nome.substring(0,40) + c.empresa);
     if (!seen[key] || c.valor > seen[key].valor) seen[key] = c;
   });
@@ -895,10 +923,16 @@ function aplicarFiltroContratos() {
     // Padrão: "AM-XXX ... XX,XX Km" ou "XXX,XX Km" próximo ao número
     let extStr = '';
     if (num) {
-      const re = new RegExp('(?:AM[\\-\\/\\s]?0*' + num + '[^\\d]{0,30}?|' + num + 'EAM\\d+[^\\d]{0,30}?)(\\d{1,4}[.,]\\d{2})\\s*[Kk]m', 'i');
+      // Aceita inteiros "79 km" e decimais "93,90 Km"
+      const re = new RegExp('(?:AM[\\-\\/\\s]?0*' + num + '[^\\d]{0,40}?|' + num + 'EAM\\d+[^\\d]{0,40}?)(\\d{1,4}(?:[.,]\\d{1,2})?)\\s*[Kk][Mm]', 'i');
       const m = re.exec(txt);
-      if (m) extStr = m[1].replace('.',',') + ' km';
+      if (m) {
+        const v = parseFloat(m[1].replace('.','').replace(',','.'));
+        if (v > 0 && v < 5000) extStr = v.toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' km';
+      }
     }
+    // Fallback direto do objeto
+    if (!extStr && c.extensaoKm) extStr = c.extensaoKm.toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' km';
     return { valorProp, nRod, extStr };
   }
   container.innerHTML = filtrados.map(c => {
@@ -1141,7 +1175,7 @@ function renderICMChart(data) {
   if (chartICMIri) chartICMIri.destroy();
   // Altura dinâmica: 22px por barra mínimo
   const wrapEl = el('icm-chart-wrap');
-  if (wrapEl) wrapEl.style.height = Math.max(300, sorted.length * 40) + 'px';
+  if (wrapEl) wrapEl.style.height = Math.max(320, sorted.length * 48) + 'px';
   chartICMIri = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -1244,23 +1278,22 @@ function renderICMList(data) {
   if (!listEl) return;
   const filtered = icmFiltroAtual === 'all' ? data : data.filter(r => r.cond === icmFiltroAtual);
   if (countEl) countEl.textContent = filtered.length;
-  listEl.innerHTML = filtered.sort((a,b)=>b.iri-a.iri).map(r =>
-    `<div class="icm-road-item" onclick="icmDestacarRodovia('${r.road}')">
+  listEl.innerHTML = filtered.sort((a,b)=>b.iri-a.iri).map(r => {
+    const pct = Math.min(r.iri/10*100,100).toFixed(0);
+    return `<div class="icm-road-item" onclick="icmDestacarRodovia('${r.road}')">
       <span class="ri-dot" style="background:${r.cond_color}"></span>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.4rem">
           <span class="ri-name">${r.road}</span>
-          <span class="ri-iri" style="color:${r.cond_color}">${r.iri.toFixed(2)}</span>
+          <span class="ri-iri" style="color:${r.cond_color};flex-shrink:0">${r.iri.toFixed(2)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1px">
-          <span class="ri-km">${r.km} km · ${r.cond_label}</span>
+        <div style="margin-top:2px;font-size:.62rem;color:var(--cinza-aux)">
+          ${r.km} km &middot; <span style="color:${r.cond_color};font-weight:700">${r.cond_label}</span>
         </div>
-        <div style="height:3px;background:#E0E6F0;border-radius:2px;margin-top:3px">
-          <div style="height:100%;background:${r.cond_color};border-radius:2px;width:${Math.min(r.iri/10*100,100).toFixed(0)}%"></div>
-        </div>
+        <div style="margin-top:4px"><span style="font-size:.58rem;font-weight:700;padding:.15em .5em;border-radius:100px;background:${r.cond_color}22;color:${r.cond_color};border:1px solid ${r.cond_color}55">${r.cond_label}</span></div>
       </div>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
 }
 function icmFiltrar(btn) {
   document.querySelectorAll('.icm-fpill').forEach(b => b.classList.remove('active'));
