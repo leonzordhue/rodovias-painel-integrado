@@ -624,9 +624,16 @@ async function carregarRodovias() {
     };
     todasRodovias = [];
     for (const linha of linhas) {
-      let extensaoVal = linha[idx.extensao] || '0';
-      extensaoVal = extensaoVal.replace(/\./g, '').replace(',', '.');
-      const extensaoNum = parseFloat(extensaoVal);
+      let extensaoRaw = (linha[idx.extensao] || '0').toString().toLowerCase().replace(/km/g,'').trim();
+      if (extensaoRaw.includes(',')) {
+        const partes = extensaoRaw.split(',');
+        const inteiro = partes[0].replace(/\./g,'');
+        const decimal = partes[1];
+        extensaoRaw = inteiro + '.' + decimal;
+      } else {
+        extensaoRaw = extensaoRaw.replace(/\./g,'');
+      }
+      const extensaoNum = parseFloat(extensaoRaw);
       if (!linha[idx.rodovia]) continue;
       todasRodovias.push({
         codigo:       linha[idx.codigo] || '',
@@ -696,6 +703,22 @@ function buscarFeaturesRodovia(nome) {
 }
 
 // CONTRATOS – associação por "RODOVIA AM-XXX"
+function extrairExtensaoDoObjeto(texto) {
+  if (!texto) return null;
+  const match = texto.match(/(\d{1,4}(?:[.,]\d{1,2})?)\s*km/i);
+  if (match) {
+    const val = match[1].replace('.','').replace(',','.');
+    const n = parseFloat(val);
+    return (!isNaN(n) && n > 0 && n < 5000) ? n : null;
+  }
+  return null;
+}
+function atualizarExtensaoContratada() {
+  let totalExt = 0;
+  todosContratos.forEach(c => { if (c.extensaoKm) totalExt += c.extensaoKm; });
+  const el2 = document.getElementById('kpiExtContratada');
+  if (el2) el2.textContent = totalExt.toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' km';
+}
 async function carregarContratos() {
   try {
     const resp = await fetch(CONTRATOS_CSV);
@@ -797,6 +820,8 @@ function obterContratosRodovia(nomeRodovia) {
   if (!cod) return [];
   // Apelidos por número de rodovia
   const apelidos = { '450': ['anel sul'], '356': ['anel viário', 'anel viario'] };
+  // Para alias "anel sul" na AM-450: excluir sinalização e viadutos (não são obras de rodovia)
+  const excluirSeAlias = /sinaliza|viaduto|obra de arte|oae/i;
   const extra = apelidos[cod.num] || [];
   // Padrões que indicam referência de localização, não objeto da obra
   const falsoPosPatterns = [
@@ -820,6 +845,7 @@ function obterContratosRodovia(nomeRodovia) {
     if (!matchPrincipal && matchAlias) {
       const temEstradaNomeada = /\b(?:estrada|rua|avenida|av\.)\s+(?:do|da|de|dos|das)?\s*[a-záàâãéêíóôõú]/i.test(txt);
       if (temEstradaNomeada) return false;
+      if (excluirSeAlias && excluirSeAlias.test(txt)) return false;
     }
     return true;
   });
