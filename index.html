@@ -136,15 +136,16 @@
     .kpi-box {
       background: var(--branco); border-radius: 12px;
       box-shadow: var(--shadow);
-      padding: 1.1rem 1.25rem;
+      padding: 1rem 1.1rem;
       border-left: 4px solid var(--azul);
+      min-width: 0; overflow: hidden;
     }
     .kpi-box.amarelo { border-left-color: var(--amarelo); }
     .kpi-box.verde   { border-left-color: var(--verde); }
     .kpi-box.laranja { border-left-color: var(--laranja); }
     .kpi-box.vermelho{ border-left-color: var(--vermelho); }
     .kpi-label { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cinza-aux); margin-bottom: .4rem; }
-    .kpi-value { font-size: 2rem; font-weight: 900; color: var(--azul); letter-spacing: -.04em; line-height: 1; }
+    .kpi-value { font-size: clamp(1rem, 2.2vw, 2rem); font-weight: 900; color: var(--azul); letter-spacing: -.04em; line-height: 1; word-break: break-all; }
     .kpi-box.amarelo .kpi-value { color: var(--amarelo); }
     .kpi-box.verde   .kpi-value { color: var(--verde); }
     .kpi-box.laranja .kpi-value { color: var(--laranja); }
@@ -752,13 +753,14 @@ async function carregarContratos() {
       const avF = parseFloat(valAt(row, I.avFisico).replace(/[%\s]/g,'').replace(',','.')) || 0;
       return {
         contrato: valAt(row, I.contrato),
-        nome: (function(s){return (s||'').replace(/https?:\/\/[^\s,]*/gi,'').split(/,\s*0\s*,|,,/)[0].replace(/[,;.\s]+$/,'').trim();})(valAt(row, I.nome)),
+        nome: (function(s){ s=(s||''); s=s.replace(/https?:\/\/\S*/gi,''); var i=s.search(/\.\s*,|\.,/); if(i>5)s=s.substring(0,i); s=s.split(/,\s*0\s*,/)[0].replace(/[,;\s]+$/,'').trim(); return s; })(valAt(row, I.nome)),
         municipio: valAt(row, I.municipio),
         statusRaw, status,
         empresa: valAt(row, I.empresa),
         valor, avFisico: avF,
         resumo: (valAt(row, I.resumo) || '').toUpperCase(),
         nomeObj: (valAt(row, I.nome) || '').toUpperCase(),
+        extensaoKm: (function(txt){ var m=(txt||'').match(/(\d{1,4}(?:[.,]\d{1,2})?)\s*km/i); if(!m)return null; var v=parseFloat(m[1].replace(',','.')); return(!isNaN(v)&&v>0&&v<5000)?v:null; })((valAt(row,I.nome)||'')+(valAt(row,I.resumo)||'')),
       };
     }).filter(c => c !== null && c.nome);
     console.log(`Contratos: ${todosContratos.length}`);
@@ -821,7 +823,7 @@ function obterContratosRodovia(nomeRodovia) {
   // Apelidos por número de rodovia
   const apelidos = { '450': ['anel sul'], '356': ['anel viário', 'anel viario'] };
   // Para alias "anel sul" na AM-450: excluir sinalização e viadutos (não são obras de rodovia)
-  const excluirSeAlias = /sinaliza|viaduto|obra de arte|oae/i;
+  const excluirSeAlias = /viaduto|obra de arte especial|^prestação.*sinaliza/i;
   const extra = apelidos[cod.num] || [];
   // Padrões que indicam referência de localização, não objeto da obra
   const falsoPosPatterns = [
@@ -902,7 +904,8 @@ function aplicarFiltroContratos() {
   container.innerHTML = filtrados.map(c => {
     const info = infoContrato(c);
     const labelValor = info.nRod > 1 ? `Valor proporcional (1/${info.nRod} rodovias)` : 'Valor Global';
-    const extRow = info.extStr ? `<div><div class="contrato-meta-label">Extensão neste trecho</div><div class="contrato-meta-value">${info.extStr}</div></div>` : '';
+    const extKm = info.extStr || (c.extensaoKm ? c.extensaoKm.toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' km' : null);
+    const extRow = extKm ? `<div><div class="contrato-meta-label">Extensão do Objeto</div><div class="contrato-meta-value">${extKm}</div></div>` : '';
     return `<div class="contrato-card"><div class="contrato-header"><div><div class="contrato-num">${c.contrato||'S/N'}</div><div class="contrato-nome">${c.nome}</div></div><div>${chipStatus(c.status)}</div></div><div class="contrato-meta">${extRow}<div><div class="contrato-meta-label">Empresa</div><div class="contrato-meta-value">${c.empresa||'—'}</div></div><div><div class="contrato-meta-label">${labelValor}</div><div class="contrato-meta-value">${formatMoney(info.valorProp)}</div></div><div><div class="contrato-meta-label">Município</div><div class="contrato-meta-value">${c.municipio||'—'}</div></div></div>${c.avFisico>0?`<div class="contrato-progress"><div class="progress-header"><span>Avanço Físico</span><span>${Math.round(c.avFisico)}%</span></div><div class="progress-bg"><div class="progress-fill ${c.avFisico<30?'low':c.avFisico>=80?'high':''}" style="width:${Math.min(100,c.avFisico)}%"></div></div></div>`:''}</div>`;
   }).join('');
 }
@@ -1138,14 +1141,14 @@ function renderICMChart(data) {
   if (chartICMIri) chartICMIri.destroy();
   // Altura dinâmica: 22px por barra mínimo
   const wrapEl = el('icm-chart-wrap');
-  if (wrapEl) wrapEl.style.height = Math.max(300, sorted.length * 26) + 'px';
+  if (wrapEl) wrapEl.style.height = Math.max(300, sorted.length * 40) + 'px';
   chartICMIri = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: sorted.map(r => r.road),
       datasets: [{ data: sorted.map(r => r.iri),
         backgroundColor: sorted.map(r => iriCor(r.iri)),
-        borderRadius: 4, borderSkipped: false, barThickness: 18 }]
+        borderRadius: 4, borderSkipped: false, barPercentage: 0.5, categoryPercentage: 0.7 }]
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
