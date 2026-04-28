@@ -771,6 +771,8 @@ async function carregarContratos() {
         valor, avFisico: avF,
         resumo: (valAt(row, I.resumo) || '').toUpperCase(),
         nomeObj: (valAt(row, I.nome) || '').toUpperCase(),
+        segmento: (valAt(row, I.segmento) || '').toUpperCase(),
+        localizacao: (valAt(row, I.localizacao) || '').toUpperCase(),
         extensaoKm: (function(txt){ var m=(txt||'').match(/(\d{1,4}(?:[.,]\d{1,2})?)\s*km/i); if(!m)return null; var v=parseFloat(m[1].replace(',','.')); return(!isNaN(v)&&v>0&&v<5000)?v:null; })((valAt(row,I.nome)||'')+(valAt(row,I.resumo)||'')),
       };
     }).filter(c => {
@@ -875,7 +877,7 @@ function obterContratosRodovia(nomeRodovia) {
   ];
   const seen = {};
   todosContratos.forEach(c => {
-    const txt = (c.resumo + ' ' + c.nomeObj).toLowerCase();
+    const txt = (c.resumo + ' ' + c.nomeObj + ' ' + (c.segmento||'') + ' ' + (c.localizacao||'')).toLowerCase();
     const matchPrincipal = cod.pattern.test(txt);
     const matchExcl      = extraExcl.some(a => txt.includes(a));
     const matchGen       = extraGen.some(a => txt.includes(a));
@@ -1236,6 +1238,7 @@ function renderICMMapRico(icmByRoad) {
     const cond = road ? getCondRoad(icmByRoad, road) : 'NoData';
     const cor   = COND_COR[cond];
     const hasICM = !!(road && icmByRoad[road]);
+    if (!hasICM) return; // só desenha trechos com medição ICM
     feat.lines.forEach(line => {
       if (line.length < 2) return;
       const ll = line.map(p => [p[0], p[1]]);
